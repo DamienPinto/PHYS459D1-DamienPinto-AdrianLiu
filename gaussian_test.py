@@ -12,7 +12,6 @@ sigma_x = np.sqrt(5)
 mu_y = 10
 sigma_y = np.sqrt(5)
 
-
 #Create grid and multivariate normal
 x = np.linspace(0,20,80)
 y = np.linspace(0,20,80)
@@ -26,10 +25,10 @@ for i in range(80):
 print 'Done.'
 
 
-fourier_universe = np.fft.ax.plot_surface(X, Y, Z,cmap='viridis',linewidth=0)
+fourier_universe = np.fft.fftshift(np.fft.rfftn(universe, axes=(0, 1)))/np.sqrt(2*6400)
+
 
 z, x, y = universe.nonzero()
-
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 2, 1, projection='3d')
@@ -39,6 +38,16 @@ ax.set_ylabel('Y1 axis')
 ax.set_zlabel('Z1 axis')
 
 
+z, x, y = fourier_universe.nonzero()
+print np.amax(fourier_universe)
+
+ax = fig.add_subplot(1, 2, 2, projection='3d')
+surf2 = ax.scatter(z, x, y, zdir='z' , c = 'red')
+ax.set_xlabel('X2 axis')
+ax.set_ylabel('Y2 axis')
+ax.set_zlabel('Z2 axis')
+
+plt.show()
 z, x, y = fourier_universe.nonzero()
 print np.amax(fourier_universe)
 
