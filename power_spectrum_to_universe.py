@@ -8,43 +8,46 @@ from mock_power_spectrum import make_power_spectrum
 from mock_power_spectrum import round_almost_correctly
 
 
-#Receive a power spectrum as an array where each value is the std_dev squared of the distribution that produced the power spectrum but also the value of #the Fourier transform at that value's index. The index is k = np.sqrt(k1**2 + k2**2 + k3**2) and is contributed to by any combination of values if k1, k2 #& k3 who, when combined in a vector (k1, k2, k3) have a norm of k
+#Receive a power spectrum as an array where each value is the std_dev squared of the Gaussian noise distribution that produced the power spectrum but 
 
-#Want to take that power spectrum and produce a Fourier Space that has that power spectrum. Has to respect F(-k) = [F(k)]* to ensure real output when #translating to actual matter distribution.
+#also the value of the Fourier transform at that value's index. The index is k = np.sqrt(k1**2 + k2**2 + k3**2) and is contributed to by any combination
+
+#of values if k1, k2 #& k3 who, when combined in a vector (k1, k2, k3) have a norm of k.
+
+#Want to take that power spectrum and produce a Fourier Space that has a power spectrum similar in statistical characteristics to the one entered. Has to respect F(-k) = [F(k)]* to ensure real output when #translating to actual matter distribution.
 
 #I'm only goping to make cubic Fourier Spaces here.
 
 
 def make_fourier_space(power_spectrum):
 
-	# print power_spectrum
-
-
-	
+	#For now just making a cubic region, can't assume shape of Fourier space used to generate power spectrum without errors.
 	side_length = int(round_almost_correctly(len(power_spectrum)/np.sqrt(3)))
-	print side_length
-	fourier_universe = np.zeros((2*side_length+1, 2*side_length+1, 2*side_length+1), dtype = complex)
-	#array containing arrays, each of which corresponds to a specific integer value of k
-	log = [[] for _ in range(len(power_spectrum))]
 
-	#Go through all the coordinates, determine their integer distance from the origin and append that set of coordinates to the log in the corresponding array.
+	#I know we discussed that spaces we use should have dimensions that are powers of two, however this method was used to ensure that all 
+	#k values can be used and that a vaue can also be placed at -k.
+	#So, for example, for k = 3, we need a space to cell to insert a value at k1 = 3 but also k1 = -3.
+	#So I figured twice the k_max + 1 for the origin.
+	fourier_universe = np.zeros((2*side_length+1, 2*side_length+1, 2*side_length+1), dtype = complex)
+	#Array containing arrays, each of which corresponds to a specific integer value of k.
+	shell_register   = [[] for _ in range(len(power_spectrum))]
+
+	#Go through all the coordinates, determine their integer distance from the origin and append that set of coordinates to the shell_register 
+	#in the corresponding array.
 	for k1 in range(side_length):
 		for k2 in range(side_length):
 			for k3 in range(side_length):
-				log[int(round_almost_correctly(np.sqrt(k1**2+k2**2+k3**2)))].append((k1, k2, k3))
+				shell_register[int(round_almost_correctly(np.sqrt(k1**2+k2**2+k3**2)))].append((k1, k2, k3))
 
-	for i in range(len(log)):
+	for i in range(len(shell_register)):
 
-		#get list of coordinates with same value for their norm from the origin
-		norm_val_list = log[i]
-
-		std_dev_sqrd  = power_spectrum[log.index(log[i])]
+		#Get list of coordinates with same value for their norm from the origin as well as the power spectrum value for that shell.
+		norm_val_list = shell_register[i]
+		std_dev_sqrd  = power_spectrum[shell_register.index(shell_register[i])]
 
 		#Dr.Adrian's method of centering distributions around 0 and giving them the same standard deviation as the value of the power spectrum
 		re_vals = np.random.normal(loc=0, scale=np.sqrt(std_dev_sqrd/2.0), size=len(norm_val_list))
-		re_vals = [re_vals[_] - np.sum(re_vals)/len(re_vals) for _ in range(len(re_vals))]
 		im_vals = np.random.normal(loc=0, scale=np.sqrt(std_dev_sqrd/2.0), size=len(norm_val_list))
-		im_vals = [im_vals[_] - np.sum(im_vals)/len(im_vals) for _ in range(len(im_vals))]
 
 		#My method using a noral distribution to chose values in Fourier space
 		# vals = np.random.normal(loc = std_dev_sqrd, scale=10, size=len(norm_val_list))
@@ -57,20 +60,24 @@ def make_fourier_space(power_spectrum):
 		# vals = np.random.rand(len(norm_val_list))
 		# vals = [vals[_] + (std_dev_sqrd-np.sum(vals)/len(vals)) for _ in range(len(vals))]
 
-		for i in range(len(norm_val_list)):
+		for j in range(len(norm_val_list)):
 
-			real_sign = np.random.choice([-1,1], 1)[0]
-			complex_sign = np.random.choice([-1,1], 1)[0]
-
-			enterred_val = np.complex(re_vals[i], im_vals[i])
+			enterred_val = np.complex(re_vals[j], im_vals[j])
 
 			# partitioning = np.random.rand()
 
 			# enterred_val = np.complex(real_sign*np.sqrt(partitioning*vals[i]), complex_sign*np.sqrt((1-partitioning)*vals[i]))
 
-			fourier_universe[norm_val_list[i][0]][norm_val_list[i][1]][norm_val_list[i][2]]	= enterred_val
 
-			fourier_universe[-(norm_val_list[i][0]+1)][-(norm_val_list[i][1]+1)][-(norm_val_list[i][2]+1)] = np.conj(enterred_val)
+			#We thought of shifting here, but after experimenting with the fast fourier transform (fft) and inverse fast fourier transform (ifft)
+			#functions I saw that the output of fft and the input that ifft takes before the shifts is one where the first value is the origin,
+			#the next entry being the value for the next smallest frequecy in Fourier, then the next... once it reaches the largest grequecy in 
+			#the Fourier space it cycles back to the largest negative frequency, so kind of [0, f1, f2, ... fN, -fN, -fN-1, ... -f1] so if I saw that 
+			#correctly then this should work. However, this does lead to having to change the way I populate the fourier space in mock_power_spectrum.py
+			#though...
+			fourier_universe[norm_val_list[j][0]][norm_val_list[j][1]][norm_val_list[j][2]]	= enterred_val
+
+			fourier_universe[-norm_val_list[j][0]][-norm_val_list[j][1]][-norm_val_list[j][2]] = np.conj(enterred_val)
 
 
 	return fourier_universe
@@ -89,12 +96,12 @@ if __name__ == '__main__':
 
 	fourier_universe = make_fourier_space(power_spectrum)
 
-	universe = np.array(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(fourier_universe), axes=(0,1,2))))
+	universe = np.array(np.fft.ifftshift(np.fft.ifftn(fourier_universe), axes=(0,1,2)))
 
 	universe_slice = np.array(np.real(universe[32,:len(universe)/2,:len(universe)/2]), dtype=float)
 
-	second_round_fourier_universe = fourier_universe = np.array(np.fft.fftshift(np.fft.fftn(np.fft.fftshift(universe), axes=(0, 1, 2))))
-	second_round_fourier_universe = second_round_fourier_universe[0:int(len(second_round_fourier_universe)/2.0), 0:int(len(second_round_fourier_universe)/2.0), 0:int(len(second_round_fourier_universe)/2.0)]
+	second_round_fourier_universe = np.array(np.fft.fftshift(np.fft.fftn(np.fft.fftshift(universe), axes=(0, 1, 2))))
+	second_round_fourier_universe = second_round_fourier_universe[int(len(second_round_fourier_universe)/4.0):3*int(len(second_round_fourier_universe)/4.0), int(len(second_round_fourier_universe)/4.0):3*int(len(second_round_fourier_universe)/4.0), int(len(second_round_fourier_universe)/4.0):3*int(len(second_round_fourier_universe)/2.0)]
 	print len(second_round_fourier_universe)
 	print 'Here'
 
