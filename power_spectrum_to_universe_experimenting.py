@@ -22,6 +22,7 @@ def make_fourier_space(power_spectrum):
 
 	#For now just making a cubic region, can't assume shape of Fourier space used to generate power spectrum without errors.
 	side_length = int(round((len(power_spectrum)/np.sqrt(3))))
+	print side_length, len(power_spectrum)/np.sqrt(3)
 
 	#I know we discussed that spaces we use should have dimensions that are powers of two, however this method was used to ensure that all 
 	#k values can be used and that a vaue can also be placed at -k.
@@ -38,6 +39,9 @@ def make_fourier_space(power_spectrum):
 			for k3 in range(side_length):
 				shell_register[int(round((np.sqrt(k1**2+k2**2+k3**2))))].append((k1, k2, k3))
 
+	shell_sizes = [len(shell_register[_]) for _ in range(len(shell_register))]
+	shell_vars_re = []
+	shell_vars_im = []
 
 	for i in range(len(shell_register)):
 
@@ -48,7 +52,8 @@ def make_fourier_space(power_spectrum):
 		#Dr.Adrian's method of centering distributions around 0 and giving them the same standard deviation as the value of the power spectrum
 		re_vals = np.random.normal(loc=0, scale=np.sqrt(std_dev_sqrd/2.0), size=len(norm_val_list))
 		im_vals = np.random.normal(loc=0, scale=np.sqrt(std_dev_sqrd/2.0), size=len(norm_val_list))
-
+		shell_vars_re.append(np.var(re_vals))
+		shell_vars_im.append(np.var(im_vals))
 
 		#My method using a noral distribution to chose values in Fourier space
 		# vals = np.random.normal(loc = std_dev_sqrd, scale=10, size=len(norm_val_list))
@@ -80,9 +85,17 @@ def make_fourier_space(power_spectrum):
 
 			fourier_universe[-norm_val_list[j][0]][-norm_val_list[j][1]][-norm_val_list[j][2]] = np.conj(enterred_val)
 
-		fourier_universe[0,0,0] = np.real(fourier_universe[0,0,0])
+		# fourier_universe[0,0,:] = [np.real(_) for _ in fourier_universe[0,0,:]]
+		# fourier_universe[0,:,0] = [np.real(_) for _ in fourier_universe[0,:,0]]
+		# fourier_universe[:,0,0] = [np.real(_) for _ in fourier_universe[:,0,0]]
 
-	return fourier_universe
+		fourier_universe[0,0,:] = np.random.normal(loc=0, scale=np.sqrt(std_dev_sqrd), size=len(fourier_universe[0,0,:]))
+		fourier_universe[0,:,0] = np.random.normal(loc=0, scale=np.sqrt(std_dev_sqrd), size=len(fourier_universe[0,:,0]))
+		fourier_universe[:,0,0] = np.random.normal(loc=0, scale=np.sqrt(std_dev_sqrd), size=len(fourier_universe[:,0,0]))
+
+		
+
+	return fourier_universe, shell_sizes, shell_vars_re, shell_vars_im
 
  
 	
@@ -92,19 +105,32 @@ def make_fourier_space(power_spectrum):
 
 if __name__ == '__main__':
 	
-	power_spectrum = sys.argv[1].replace('[', '').replace(']', '').replace('\n', '').split(', ')
-	power_spectrum = np.array([float(i) for i in power_spectrum])
+	# power_spectrum = sys.argv[1].replace('[', '').replace(']', '').replace('\n', '').split(', ')
+	# power_spectrum = [float(i) for i in power_spectrum]
+	# power_spectrum = np.array(power_spectrum, dtype = float)
 
+	power_spectrum = np.array([10]*55)
 
-	fourier_universe = make_fourier_space(power_spectrum)
+	fourier_universe, shell_sizes, shell_vars_re, shell_vars_im = make_fourier_space(power_spectrum)
 
 	universe = np.array(np.fft.ifftshift(np.fft.ifftn(fourier_universe), axes=(0,1,2)))
+	partial_universe = universe[:len(universe), :len(universe), :len(universe)]
 
-	universe_slice = np.array(np.real(universe[32,:,:]), dtype=float)
+	universe_slice = np.array(np.real(partial_universe[32,:len(partial_universe),:len(partial_universe)]), dtype=float)
 
-	second_round_fourier_universe = np.array(np.fft.fftshift(np.fft.fftn(np.fft.fftshift(universe), axes=(0, 1, 2))))
+	second_round_fourier_universe = np.array(np.fft.fftshift(np.fft.fftn(np.fft.fftshift(partial_universe), axes=(0, 1, 2))))
+	# second_round_fourier_universe /= np.sqrt(len(second_round_fourier_universe)**3)
+	# second_round_fourier_universe = second_round_fourier_universe[int(len(second_round_fourier_universe)/4.0):3*int(len(second_round_fourier_universe)/4.0), int(len(second_round_fourier_universe)/4.0):3*int(len(second_round_fourier_universe)/4.0), int(len(second_round_fourier_universe)/4.0):3*int(len(second_round_fourier_universe)/4.0)]
+	# print len(second_round_fourier_universe)
+	# print 'Here'
 
 	second_round_power_spectrum, counting_errors = make_power_spectrum(np.fft.ifftshift(second_round_fourier_universe))
+
+	print "Real:", shell_vars_re
+	print 'Imaginary:', shell_vars_im
+
+	# second_round_power_spectrum, counting_errors = make_power_spectrum(np.fft.fftshift(fourier_universe[:len(fourier_universe)/2, :len(fourier_universe)/2, :len(fourier_universe)/2]))
+
 
 
 	k_ubound = 1.0/4.0/math.pi
@@ -129,7 +155,7 @@ if __name__ == '__main__':
 	ax.errorbar(k, second_round_power_spectrum, yerr=counting_errors, ecolor='r')
 	# ax.xaxis.set_major_formatter(FormatStrFormatter('%0.4f'))
 	k_step 	   = float((k_ubound - k_lbound)/len(k))
-	# print float(k_step)
+	print float(k_step)
 	tick_marks = np.zeros(len(k))
 	tick_marks = ['%0.2f' % float(k_step*i) for i in range(0, len(k), 10)]
 	plt.xticks(np.arange(0, len(second_round_power_spectrum), 10), tick_marks, rotation=90)

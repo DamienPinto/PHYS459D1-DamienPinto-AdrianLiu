@@ -7,38 +7,33 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 import numpy as np
 
-def round_almost_correctly(number):
-	if number%1 >= 0.5:
-		return int(number) + 1
-	else:
-		return int(number)
 
 def make_power_spectrum(fourier_universe):
 	
 	#The biggest distance from the origin is the one ant the furthest corner so the biggest k would be the norma at the max length in each dimension.
-	k_max = round_almost_correctly(float(math.sqrt((len(fourier_universe)/2)**2 + (len(fourier_universe[0])/2)**2 + (len(fourier_universe[0][0])/2)**2)))
+	k_max = round(float(math.sqrt((len(fourier_universe)/2.0)**2 + (len(fourier_universe[0])/2.0)**2 + (len(fourier_universe[0][0])/2.0)**2)))
 	# print k_max
 	#Make the power spectrum have that many points. The power_spectrum_log keeps a log gives all the values of k an array and keeps track of all the
 	#values in the Fourier transformed universe with that value of k.
-	power_spectrum_log = [[] for _ in range(int(k_max)+1)]
-	power_spectrum 	   = [0 for _ in range(int(k_max)+1)]
-	counting_errors	   = [0 for _ in range(int(k_max)+1)]
+	power_spectrum_log = [[] for _ in range(int(k_max))]
+	power_spectrum 	   = [0 for _ in range(int(k_max))]
+	counting_errors	   = [0 for _ in range(int(k_max))]
 
 	# print -len(fourier_universe)/2
 
 
 	#Cycle through all the points in the Fourier transformed universe...
 	#Since what is given to the make_power_spectrum function is the Fourier space *after* the shifts, then the central frequency should be the DC term,
-	#,the first should be the most negative frequency, and the last should be the largest positive frequncy.
-	for k1 in range(-len(fourier_universe)/2+1, len(fourier_universe)/2):
-		for k2 in range(-len(fourier_universe[k1])/2+1, len(fourier_universe[k1])/2):
-			for k3 in range(-len(fourier_universe[k1][k2])/2+1, len(fourier_universe[k1][k2])/2):
+	#the first should be the most negative frequency, and the last should be the largest positive frequncy.
+	for k1 in range(-len(fourier_universe)/2, len(fourier_universe)/2-1):
+		for k2 in range(-len(fourier_universe[k1])/2, len(fourier_universe[k1])/2-1):
+			for k3 in range(-len(fourier_universe[k1][k2])/2, len(fourier_universe[k1][k2])/2-1):
 				# print (k1+len(fourier_universe)/2, k2+len(fourier_universe[k1])/2, k3/len(fourier_universe[k1][k2])/2)
 				#...determine it's distance from the origin, its k...
-				k = round_almost_correctly(float(math.sqrt(np.abs(k1)**2 + np.abs(k2)**2 + np.abs(k3)**2)))
+				k = int(round(float(math.sqrt(np.abs(k1)**2 + np.abs(k2)**2 + np.abs(k3)**2))))
 				# print k, len(power_spectrum), k1+len(fourier_universe)/2, len(fourier_universe), k2+len(fourier_universe)/2, len(fourier_universe[k1]), k2+len(fourier_universe)/2, len(fourier_universe[k1][k2])
 				#...append the norm squared of that value to the correct array in the power_spectrum_log.
-				power_spectrum_log[k].append(float(np.abs(fourier_universe[k1+len(fourier_universe)/2][k2+len(fourier_universe[k1])/2][k3+len(fourier_universe[k1][k2])/2])**2))
+				power_spectrum_log[k-1].append(float(np.abs(fourier_universe[k1+len(fourier_universe)/2][k2+len(fourier_universe[k1])/2][k3+len(fourier_universe[k1][k2])/2])**2))
 
 
 	#For each value of k, average over the values of the points with that k and place the result in the power spectrum,
@@ -80,15 +75,13 @@ if __name__ == '__main__':
 
 
 		#Get max number of steps in each spatial dimension.
-		#Formula returns closest power of 2 just above the number of steps there should be in each direction (determined by i-max/di).
-		Nx		 = 1<<(int(float(xmax/dx))-1).bit_length()
-		Ny 		 = 1<<(int(float(ymax/dx))-1).bit_length()
-		Nz 		 = 1<<(int(float(zmax/dz))-1).bit_length()
+		#Formula returns closest power of 2 just under the number of steps there should be in each direction (determined by i_max/di).
+		Nx		 = (1<<(int(xmax/dx)).bit_length())/2
+		Ny 		 = (1<<(int(ymax/dx)).bit_length())/2
+		Nz 		 = (1<<(int(zmax/dz)).bit_length())/2
 
 		k_lbound = float(1.0/4.0/math.pi/max([xmax, ymax, zmax]))
 		k_ubound = float(1.0/4.0/math.pi/min([dx,dy,dz]))
-		# print k_lbound
-		# print k_ubound
 
 		mean 	 = float(sys.argv[8])
 		std_dev  = float(sys.argv[9])
@@ -99,10 +92,7 @@ if __name__ == '__main__':
 	fourier_universe = np.array(np.fft.fftshift(np.fft.fftn(np.fft.fftshift(universe), axes=(0, 1, 2))))
 	#Normalize the space.
 	fourier_universe /= np.sqrt(len(fourier_universe)**3)
-	# print np.abs(np.amax(fourier_universe))**2
-	# print np.abs(np.amin(fourier_universe))**2
 	
-	#fourier_universe = discreet_fourier_transform(universe, dx, dy, dz, Nx, Ny, Nz)
 	power_spectrum,	counting_errors = make_power_spectrum(fourier_universe)
 	print power_spectrum
 	print counting_errors
@@ -120,8 +110,8 @@ if __name__ == '__main__':
 	ax.set_xlabel("k")
 	ax.set_title("Power Spectrum of Spherically Averaged Gaussian Noise")
 	# ax.plot(k, power_spectrum)
-	print len(k)
-	print len(counting_errors)
+	# print len(k)
+	# print len(counting_errors)
 	ax.errorbar(k, power_spectrum, yerr=counting_errors, ecolor='r')
 	# ax.xaxis.set_major_formatter(FormatStrFormatter('%0.4f'))
 	k_step 	   = float((k_ubound - k_lbound)/len(k))
